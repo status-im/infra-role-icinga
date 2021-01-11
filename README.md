@@ -1,3 +1,5 @@
+# WARNING: This role is no longer used.
+
 # Description
 
 This role configures an [Icinga2](https://icinga.com/products/icinga-2/) which is a monitoring tool which is used to manage canaries for Status websites as well as `statusd` nodes.
