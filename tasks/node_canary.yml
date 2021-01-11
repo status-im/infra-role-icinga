@@ -1,0 +1,43 @@
+---
+# Build node-canary from git repo -------------------------------
+- name: Download status-go to deploy node-canary
+  git:
+    repo: '{{ status_go_repo }}'
+    dest: '{{ status_go_path }}'
+    version: '{{ status_go_version }}'
+    depth: 1
+    update: true
+    umask: '0000'
+  register: repo
+  tags: ['icinga::node-canary']
+
+# We use Buster because of host newer GLibC version
+- name: Build node-canary
+  docker_container:
+    name: 'build-node-canary'
+    image: 'golang:1.14-buster'
+    detach: false
+    command: 'make node-canary'
+    working_dir: '/repo'
+    volumes:
+      - '{{ status_go_path }}:/repo'
+  tags: ['icinga::node-canary']
+
+- name: Copy over the node-canary binary
+  copy:
+    remote_src: true
+    src: '{{ status_go_path }}/build/bin/node-canary'
+    dest: '{{ icinga_cont_vol }}/plugins/node-canary'
+    owner: '{{ icinga_api_host_uid }}'
+    group: docker
+    mode: 0775
+  tags: ['icinga::node-canary']
+
+- name: Create a wrapper for cleaning pipes from canary output
+  copy:
+    src: 'node-canary-wrap.sh'
+    dest: '{{ icinga_cont_vol }}/plugins/node-canary-wrap'
+    owner: '{{ icinga_api_host_uid }}'
+    group: docker
+    mode: 0775
+  tags: ['icinga::node-canary']

@@ -1,0 +1,16 @@
+FROM jordan/icinga2:{{ icinga_cont_version }}
+
+MAINTAINER Jakub Sokołowski <jakub@status.im>
+
+# Install VictorOps plugin for sending alerts
+# https://help.victorops.com/knowledge-base/victorops-icinga-integration/
+RUN wget {{ victorops_deb_url }} \
+ && dpkg -i {{ victorops_deb_file }} \
+ && rm {{ victorops_deb_file }}
+
+# we run our own mysql in a separate container
+RUN rm /etc/supervisor/conf.d/mysql.conf
+
+LABEL source="https://github.com/status-im/infra-hq"
+LABEL description="Modified Icinga2 Image for use with VictorOps"
+LABEL maintainer="jakub@status.im"

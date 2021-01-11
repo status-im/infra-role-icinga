@@ -1,0 +1,19 @@
+---
+- name: Create Consul service definition
+  include_role: name=consul-service
+  vars:
+    consul_config_name: '{{ icinga_cont_name }}-api'
+    consul_services:
+      - name: '{{ icinga_cont_name }}-api'
+        tags: ['canary']
+        # we advertise the port with basic auth
+        port: '{{ icinga_api_port }}'
+        address: '{{ ansible_local.tinc.vpn_ip }}'
+        checks:
+          - id: '{{ icinga_cont_name }}-api-health'
+            name: ElasticHQ Healthcheck
+            type: http
+            http: 'https://localhost:{{ icinga_api_port }}/v1/status/IcingaApplication'
+            tls_skip_verify: true
+            header:
+              Authorization: ['Basic {{ ("consul:" + icinga_consul_pass) | b64encode }}']

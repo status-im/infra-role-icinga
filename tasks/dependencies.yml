@@ -1,0 +1,43 @@
+---
+- name: Uninstall Go from APT
+  apt:
+    name: golang
+    state: absent
+    autoremove: true
+  tags: ['icinga::dependencies']
+
+- name: Remove old Go installation
+  file:
+    path: '/usr/local/go'
+    state: absent
+  tags: ['icinga::dependencies']
+
+- name: Download Go tarball
+  get_url:
+    url: 'https://dl.google.com/go/{{ golang_arch }}'
+    dest: '/tmp/{{ golang_arch }}'
+    checksum: 'md5:{{ golang_md5 }}'
+  tags: ['icinga::dependencies']
+
+- name: Extract Go tarball
+  unarchive:
+    src: '/tmp/{{ golang_arch }}'
+    dest: '/usr/local'
+    remote_src: yes
+  environment:
+    PATH: '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+  tags: ['icinga::dependencies']
+
+- name: Symlink Go binary
+  file:
+    src: '/usr/local/go/bin/go'
+    path: '/usr/local/bin/go'
+    state: link
+    force: true
+  tags: ['icinga::dependencies']
+
+- name: Remove Go tarball
+  file:
+    path: '/tmp/{{ golang_arch }}'
+    state: absent
+  tags: ['icinga::dependencies']

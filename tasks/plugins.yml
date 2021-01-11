@@ -1,0 +1,22 @@
+---
+# This tempalate comes from /opt/victorops/nagios_plugin/icinga2_conf/victorops.conf
+# For more details see: https://help.victorops.com/knowledge-base/victorops-icinga-integration/
+- name: Generate the VictorOps configuration
+  template:
+    src: victorops.conf.j2
+    dest: '{{ icinga_conf_d_path }}/victorops.status-im.conf'
+
+- name: Fix permissions on the /etc/icinga*2 folders
+  file:
+    path: '{{ item }}'
+    owner: '{{ icinga_api_host_uid }}'
+    group: '{{ icinga_api_host_gid }}'
+    recurse: true
+  with_items:
+    - '{{ icinga_cont_vol }}/etc/icinga2'
+    - '{{ icinga_cont_vol }}/etc/icingaweb2'
+
+- name: Fix permissions on the conf.d folder
+  file:
+    path: '{{ icinga_conf_d_path }}'
+    mode: 0755

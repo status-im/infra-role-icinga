@@ -1,0 +1,81 @@
+---
+# We have to update it after container was started because
+# the container generates files in /etc/icingaweb2
+# and if one of them is there it fails
+#
+# WARNING: Wrong permissions here will cause login issues
+# Details: https://github.com/Icinga/icingaweb2/issues/3737
+- name: Enable autologin in Icinga Web UI
+  template:
+    src: icingaweb_auth.ini.j2
+    dest: '{{ icinga_cont_vol }}/etc/icingaweb2/authentication.ini'
+    owner: '{{ icinga_api_host_uid }}'
+    group: '{{ icinga_api_host_gid }}'
+    mode: 755
+    group: docker
+  register: auth
+
+- name: Configure general settings
+  copy:
+    src: '{{ item }}'
+    dest: '{{ icinga_cont_vol }}/etc/icinga2/conf.d/'
+    owner: '{{ icinga_api_host_uid }}'
+    group: docker
+  register: general
+  with_fileglob:
+    - files/general/*
+
+- name: Generate general settings from templates 
+  template:
+    src: '{{ item }}'
+    dest: '{{ icinga_conf_d_path }}/{{ item | basename | replace(".j2", "") }}'
+  with_fileglob:
+    - templates/icinga/*
+
+- name: Fix permissions on the /etc/icinga*2 folders
+  file:
+    path: '{{ item }}'
+    owner: '{{ icinga_api_host_uid }}'
+    group: '{{ icinga_api_host_gid }}'
+    recurse: true
+  with_items:
+    - '{{ icinga_cont_vol }}/etc/icinga2'
+    - '{{ icinga_cont_vol }}/etc/icingaweb2'
+
+- name: Create folder for pages
+  file:
+    path: '{{ icinga_cont_vol }}/etc/icinga2/conf.d/pages'
+    owner: '{{ icinga_api_host_uid }}'
+    group: docker
+    state: directory
+
+- name: Configure pages checks
+  copy:
+    src: '{{ item }}'
+    dest: '{{ icinga_cont_vol }}/etc/icinga2/conf.d/pages/'
+    owner: '{{ icinga_api_host_uid }}'
+    group: docker
+  register: pages
+  with_fileglob:
+    - files/pages/*
+
+- name: Create folder for xcheck
+  file:
+    path: '{{ icinga_cont_vol }}/etc/icinga2/conf.d/xcheck'
+    owner: '{{ icinga_api_host_uid }}'
+    group: docker
+    state: directory
+
+- name: Configure xcheck checks
+  copy:
+    src: '{{ item }}'
+    dest: '{{ icinga_cont_vol }}/etc/icinga2/conf.d/xcheck/'
+    owner: '{{ icinga_api_host_uid }}'
+    group: docker
+  register: xcheck
+  with_fileglob:
+    - files/xcheck/*
+
+- name: Reload the icinga container
+  command: docker exec {{ icinga_cont_name }} supervisorctl reload icinga2
+  when: auth.changed or general.changed or pages.changed

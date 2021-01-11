@@ -1,0 +1,44 @@
+---
+# Build x-check-mailserver from git repo -----------------------
+- name: Download statusd-bots to deploy x-check-mailserver
+  git:
+    repo: '{{ statusd_bots_repo }}'
+    dest: '{{ statusd_bots_path }}'
+    version: '{{ statusd_bots_version }}'
+    depth: 1
+    update: true
+    force: true
+    umask: '0000'
+  register: repo
+  tags: ['icinga::x-check']
+
+# We use Buster because of host newer GLibC version
+- name: Build x-check-mailserver
+  docker_container:
+    name: 'build-x-check-mailserver'
+    image: 'golang:1.14-buster'
+    detach: false
+    command: 'make x-check-mailserver'
+    working_dir: '/repo'
+    volumes:
+      - '{{ statusd_bots_path }}:/repo'
+  tags: ['icinga::x-check']
+
+- name: Copy over the node-canary binary
+  copy:
+    remote_src: true
+    src: '{{ statusd_bots_path }}/bin/x-check-mailserver'
+    dest: '{{ icinga_cont_vol }}/plugins/x-check-mailserver'
+    owner: '{{ icinga_api_host_uid }}'
+    group: docker
+    mode: 0775
+  tags: ['icinga::x-check']
+
+- name: Create a wrapper for cleaning pipes from canary output
+  copy:
+    src: 'x-check-mail-wrap.sh'
+    dest: '{{ icinga_cont_vol }}/plugins/x-check-mail-wrap'
+    owner: '{{ icinga_api_host_uid }}'
+    group: docker
+    mode: 0775
+  tags: ['icinga::x-check']

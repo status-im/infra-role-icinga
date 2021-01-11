@@ -1,0 +1,12 @@
+---
+- import_tasks: dependencies.yml
+- import_tasks: pre_config.yml
+- import_tasks: image.yml
+- import_tasks: container.yml
+- import_tasks: plugins.yml
+- import_tasks: node_canary.yml
+- import_tasks: x_check_mailserver.yml
+- import_tasks: hosts.yml
+- import_tasks: post_config.yml
+- import_tasks: firewall.yml
+- import_tasks: consul.yml

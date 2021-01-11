@@ -1,0 +1,21 @@
+---
+# VictorOps integration requires extra packages so we update the image
+- name: Create folder for building the docker image
+  file:
+    path: '/var/tmp/icinga'
+    state: directory
+
+- name: Template the Dockerfile for Icinga
+  template:
+    src: 'Dockerfile.j2'
+    dest: '/var/tmp/icinga/Dockerfile'
+    mode: 0755
+  register: dockerfiles
+
+- name: Install required packages in Icinga2 docker image
+  docker_image:
+    name: '{{ icinga_cont_image_mod_name }}'
+    tag: '{{ icinga_cont_image_mod_tag }}'
+    force: '{{ dockerfiles.changed | default(false) }}'
+    build:
+      path: '/var/tmp/icinga'

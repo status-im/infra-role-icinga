@@ -1,0 +1,63 @@
+---
+- name: Start MySQL container
+  docker_container:
+    name: '{{ db_cont_name }}'
+    image: '{{ db_cont_image }}'
+    pull: true
+    restart_policy: always
+    state: '{{ cont_state }}'
+    recreate: '{{ cont_recreate }}'
+    restart: '{{ cont_restart }}'
+    env:
+      MYSQL_ROOT_PASSWORD: '{{ lookup("passwordstore", "services/icinga/db-root-pass")}}'
+      MYSQL_DATABASE:      'icinga'
+      MYSQL_USER:          '{{ lookup("passwordstore", "services/icinga/db-user")}}'
+      MYSQL_PASSWORD:      '{{ lookup("passwordstore", "services/icinga/db-pass")}}'
+      MYSQL_ROOT_HOST:     '%'
+    ports:
+      - '0.0.0.0:{{ db_cont_port }}:{{ db_cont_port }}'
+    volumes:
+      - '{{ db_cont_vol }}/data:/var/lib/mysql'
+
+- name: Start Icinga2 container
+  docker_container:
+    name: '{{ icinga_cont_name }}'
+    image: '{{ icinga_cont_image_mod_name }}:{{ icinga_cont_image_mod_tag }}'
+    pull: false
+    restart_policy: always
+    state: '{{ cont_state }}'
+    recreate: '{{ cont_recreate }}'
+    restart: '{{ cont_restart }}'
+    hostname: '{{ hostname }}'
+    links:
+      - '{{ db_cont_name }}:db'
+    env:
+      ICINGAWEB2_ADMIN_USER: '{{ lookup("passwordstore", "services/icinga/user") }}'
+      ICINGAWEB2_ADMIN_PASS: '{{ lookup("passwordstore", "services/icinga/pass") }}'
+      DEFAULT_MYSQL_HOST:  'db'
+      DEFAULT_MYSQL_PORT:  '{{ db_cont_port | string }}'
+      DEFAULT_MYSQL_USER:  '{{ lookup("passwordstore", "services/icinga/db-user") }}'
+      DEFAULT_MYSQL_PASS:  '{{ lookup("passwordstore", "services/icinga/db-pass") }}'
+      MYSQL_ROOT_PASSWORD: '{{ lookup("passwordstore", "services/icinga/db-root-pass") }}'
+    ports:
+      - '0.0.0.0:{{ icinga_web_port }}:{{ icinga_cont_web_port }}'
+      - '0.0.0.0:{{ icinga_api_port }}:{{ icinga_api_port }}'
+    mounts:
+      - target: /tmp
+        type: 'tmpfs'
+        tmpfs_size: '131072K'
+    volumes:
+      - '{{ icinga_cont_vol }}/etc/icinga2:/etc/icinga2'
+      - '{{ icinga_cont_vol }}/etc/icingaweb2:/etc/icingaweb2'
+      - '{{ icinga_cont_vol }}/plugins:/var/tmp/nagios/plugins'
+      - '{{ icinga_cont_vol }}/data:/var/lib/icinga2'
+      - '{{ icinga_cont_vol }}/logs:/var/log/icinga2'
+      - '{{ icinga_cont_vol }}/conf/ssmtp.conf:/etc/ssmtp/ssmtp.conf'
+      - '{{ icinga_cont_vol }}/conf/apache_icinga.conf:/etc/apache2/conf-enabled/icingaweb2.conf'
+
+- name: Wait for the Icinga API port to become available
+  wait_for:
+    host: '127.0.0.1'
+    port: '{{ icinga_api_port }}'
+    delay: 5
+    state: drained

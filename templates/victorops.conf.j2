@@ -1,0 +1,227 @@
+#------------------------------------------------------------------------------------------------
+##########################            ACCOUNT CONFIGURATION            ##########################
+##  These identify your alerts to VictorOps.  The values for these fields are assigned to you
+##  by VictorOps and can be found in the Icinga section of the integrations page.
+##
+const VictorOps_ORGANIZATION_ID     = "{{ victorops_org_id | mandatory }}"
+const VictorOps_ORGANIZATION_KEY    = "{{ victorops_service_key | mandatory }}"
+
+##########################        FAILSAFE EMAIL CONFIGURATION         ##########################
+## The backup alert email address.  If for any reason the plugin is unable to contact
+## the VictorOps URL, an alert email will be sent to this address. You may configure multiple
+## addresses by separating them with spaces and enclosing the whole thing in single quotes:
+##      "me@mydomain.com you@mydomain.com him@mydomain.com"
+const VictorOps_CONTACTEMAIL        = "{{ victorops_contact_email | mandatory }}"
+
+## The maximum amount of time (in seconds) that alerts will be allowed to remain in
+## the queue before the alert is sent to the contact address above.
+const VictorOps_MAX_SEND_DELAY      = "60"
+
+##########################            ROUTING CONFIGURATION            ##########################
+# This default user and notification apply configuration will send all host and service alerts
+# to VictorOps via the VictorOps user.  If you wish to use VictorOps routing keys, create a
+# user for each routing key, and create appropriate notification apply rules to those users.
+# See the VictorOps Icinga2 knowledge base for more information.
+
+apply Notification "notify-victorops-host" to Host {
+    import "notify-victorops-host"
+    assign where match("*", host.name)
+}
+
+apply Notification "notify-victorops-service" to Service {
+    import "notify-victorops-service"
+    assign where match("*", service.name)
+    ignore where match("victorops-forwarder", service.name)
+}
+
+
+##########################            ACK-BACK CONFIGURATION           ##########################
+const VictorOps_enable_cmd_poll     = {{ victorops_ack_back | to_json }}
+#------------------------------------------------------------------------------------------------
+
+# Other required configuration...
+
+## Identifies this Icinga host to VictorOps.
+const VictorOps_MONITOR_NAME        = "{{ icinga_domain | default("Icinga Canaries") }}"
+
+# Probably in these locations:
+const IcingaCmdPipe                 = "/var/run/icinga2/cmd/icinga2.cmd"
+const IcingaStatusFile              = "/var/cache/icinga2/status.dat"
+const printf_executable             = "/usr/bin/printf"
+const mail_executable               = "/usr/bin/mail"
+
+## These should not need modification
+const VictorOps_PLUGIN_HOME         = "/opt/victorops/nagios_plugin"
+const VictorOps_LOG_DIR             = "/var/log/victorops"
+const VictorOps_QUEUE_DIR           = "/var/nagios"
+const VictorOps_PROTOCOL            = "https"
+const VictorOps_ALERT_HOST          = "alert.victorops.com"
+const VictorOps_ALERT_URL           = "/nagios"
+const VictorOps_COMMAND_URL         = "/nagiosCmds"
+const VictorOps_STATUS_URL          = "/nagiosStatus"
+const VictorOps_PING_URL            = "/ping"
+
+
+object NotificationCommand "victorops-notification" {
+    import "plugin-notification-command"
+
+    command = VictorOps_PLUGIN_HOME + "/bin/enqueue_alert >> " + VictorOps_LOG_DIR + "/enqueue_alerts.log 2>&1"
+
+    env = {
+        ICINGA_COMMANDFILE                  = IcingaCmdPipe
+        ICINGA_STATUSDATAFILE               = IcingaStatusFile
+        ICINGA_TIMET                        = "$icinga.timet$"
+        ICINGA_NOTIFICATIONTYPE             = "$notification.type$"
+        ICINGA_HOSTNAME                     = "$host.name$"
+        ICINGA_HOSTALIAS                    = "$host.display_name$"
+        ICINGA_HOSTADDRESS                  = "$address$"
+        ICINGA_HOSTSTATE                    = "$host.state$"
+        ICINGA_LASTHOSTSTATECHANGE          = "$host.last_state_change$"
+        ICINGA_LONGDATETIME                 = "$icinga.long_date_time$"
+        ICINGA_NOTIFICATIONAUTHOR           = "$notification.author$"
+        ICINGA_NOTIFICATIONCOMMENT          = "$notification.comment$"
+        ICINGA_HOSTDISPLAYNAME              = "$host.display_name$"
+        ICINGA_CONTACTGROUPNAME             = "$user.name$"
+
+        ICINGA__CONTACTVO_ORGANIZATION_ID   = VictorOps_ORGANIZATION_ID
+        ICINGA__CONTACTVO_ORGANIZATION_KEY  = VictorOps_ORGANIZATION_KEY
+        ICINGA__CONTACTVO_MONITOR_NAME      = VictorOps_MONITOR_NAME
+        ICINGA__CONTACTVO_CONTACTEMAIL      = VictorOps_CONTACTEMAIL
+        ICINGA__CONTACTVO_MAX_SEND_DELAY    = VictorOps_MAX_SEND_DELAY
+        ICINGA__CONTACTVO_PLUGIN_HOME       = VictorOps_PLUGIN_HOME
+        ICINGA__CONTACTVO_LOG_DIR           = VictorOps_LOG_DIR
+        ICINGA__CONTACTVO_QUEUE_DIR         = VictorOps_QUEUE_DIR
+        ICINGA__CONTACTVO_PROTOCOL          = VictorOps_PROTOCOL
+        ICINGA__CONTACTVO_ALERT_HOST        = VictorOps_ALERT_HOST
+        ICINGA__CONTACTVO_ALERT_URL         = VictorOps_ALERT_URL
+        ICINGA__CONTACTVO_COMMAND_URL       = VictorOps_COMMAND_URL
+        ICINGA__CONTACTVO_STATUS_URL        = VictorOps_STATUS_URL
+        ICINGA__CONTACTVO_PING_URL          = VictorOps_PING_URL
+    }
+}
+
+object NotificationCommand "victorops-svc-notification" {
+    import "victorops-notification"
+
+    env += {
+        ICINGA_SERVICEDESC                  = "$service.name$"
+        ICINGA_SERVICEDISPLAYNAME           = "$service.display_name$"
+        ICINGA_SERVICEOUTPUT                = "$service.output$"
+        ICINGA_SERVICESTATE                 = "$service.state$"
+        ICINGA_LASTSERVICESTATECHANGE       = "$service.last_state_change$"
+    }
+}
+
+object User "VictorOps" {
+    import "generic-user"
+    display_name = "VictorOps"
+}
+
+template Notification "notify-victorops" {
+    users   = [ "VictorOps" ]
+    types   = [ Problem, Acknowledgement, Recovery ]
+    command = "victorops-notification"
+    period  = "24x7"
+}
+
+template Notification "notify-victorops-host" {
+    import "notify-victorops"
+    states  = [ Up, Down ]
+}
+
+template Notification "notify-victorops-service" {
+    import "notify-victorops"
+    states  = [ Warning, Unknown, Critical, OK ]
+    command = "victorops-svc-notification"
+}
+
+template CheckCommand "check-victorops" {
+    import "plugin-check-command"
+
+    env = {
+        MONITOR_SW                          = "ICINGA2"
+        ICINGA_COMMANDFILE                  = IcingaCmdPipe
+        ICINGA_STATUSDATAFILE               = IcingaStatusFile
+        ICINGA_HOSTNAME                     = NodeName
+
+        ICINGA__SERVICEVO_ORGANIZATION_ID   = VictorOps_ORGANIZATION_ID
+        ICINGA__SERVICEVO_ORGANIZATION_KEY  = VictorOps_ORGANIZATION_KEY
+        ICINGA__SERVICEVO_MONITOR_NAME      = VictorOps_MONITOR_NAME
+        ICINGA__SERVICEVO_CONTACTEMAIL      = VictorOps_CONTACTEMAIL
+        ICINGA__SERVICEVO_MAX_SEND_DELAY    = VictorOps_MAX_SEND_DELAY
+        ICINGA__SERVICEVO_PLUGIN_HOME       = VictorOps_PLUGIN_HOME
+        ICINGA__SERVICEVO_LOG_DIR           = VictorOps_LOG_DIR
+        ICINGA__SERVICEVO_QUEUE_DIR         = VictorOps_QUEUE_DIR
+        ICINGA__SERVICEVO_PROTOCOL          = VictorOps_PROTOCOL
+        ICINGA__SERVICEVO_ALERT_HOST        = VictorOps_ALERT_HOST
+        ICINGA__SERVICEVO_ALERT_URL         = VictorOps_ALERT_URL
+        ICINGA__SERVICEVO_COMMAND_URL       = VictorOps_COMMAND_URL
+        ICINGA__SERVICEVO_STATUS_URL        = VictorOps_STATUS_URL
+        ICINGA__SERVICEVO_PING_URL          = VictorOps_PING_URL
+    }
+}
+
+object CheckCommand "check-victorops-heartbeat" {
+    import "check-victorops"
+    command = VictorOps_PLUGIN_HOME + "/bin/do_victorops_heartbeat"
+}
+
+object CheckCommand "check-victorops-forwarder" {
+    import "check-victorops"
+    command = VictorOps_PLUGIN_HOME + "/bin/check_victorops_forwarder 2>&1"
+}
+
+object CheckCommand "check-victorops-commands" {
+    import "check-victorops"
+    command = VictorOps_PLUGIN_HOME + "/bin/check_victorops_cmds"
+}
+
+template Service "victorops-service" {
+    host_name = NodeName
+    check_interval = 60s
+    retry_interval = 60s
+}
+
+object Service "victorops-heartbeat" {
+    import "victorops-service"
+
+    display_name   = "VictorOps Heartbeat"
+    check_command  = "check-victorops-heartbeat"
+    check_interval = 300s
+}
+
+object Service "victorops-forwarder" {
+    import "victorops-service"
+
+    display_name   = "VictorOps Alert Forwarder"
+    check_command  = "check-victorops-forwarder"
+}
+
+object Service "victorops-cmd-poll" {
+    import "victorops-service"
+
+    display_name   = "VictorOps Command Poll"
+    check_command  = "check-victorops-commands"
+    enable_active_checks = VictorOps_enable_cmd_poll
+}
+
+#-------------------------------------------------------------------------------------
+# Alert if the alert forwarder service is not running.
+# Because it's not running, we can only alert via email.
+#-------------------------------------------------------------------------------------
+object NotificationCommand "victorops-forwarder-fail-notification" {
+    import "victorops-notification"
+    command = printf_executable + " '%b' '\\n$icinga.date$ $icinga.time$\\n\\n$notification.type$: $host.name$/$service.name$ is $service.state$\\n\\n' | " + mail_executable + " -s '$notification.type$: $host.name$/$service.name$ is $service.state$' " + VictorOps_CONTACTEMAIL + " failsafe+" + VictorOps_ORGANIZATION_ID + "@victorops.net >> " + VictorOps_LOG_DIR + "/forwarder_fail.out 2>&1"
+}
+
+apply Notification "notify-forwarder-fail" to Service {
+    import "notify-victorops"
+    command = "victorops-forwarder-fail-notification"
+    states  = [ Warning, Unknown, Critical, OK ]
+    assign where match("victorops-forwarder", service.name)
+}
+
+object CheckCommand "manual-send-status" {
+    import "check-victorops"
+    command = VictorOps_PLUGIN_HOME + "/bin/send_status -m"
+}

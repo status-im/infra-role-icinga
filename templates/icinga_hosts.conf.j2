@@ -1,0 +1,40 @@
+{% for tag in host_tags %}
+object HostGroup "eth.{{ tag }}" {}
+{% endfor %}
+
+{% for tag in service_tags %}
+object ServiceGroup "{{ tag }}" {}
+{% endfor %}
+
+{% for host in statusd_hosts %}
+object Host "{{ host.Node }}" {
+  import "generic-host"
+  address = "{{ host.Address }}"
+  groups = [ "eth.{{ host.Meta.stage }}" ]
+}
+
+{% endfor %}
+
+{% for srvc in mail_servers %}
+object Service "{{ srvc.ServiceID }}" {
+  import "generic-service"
+  check_command = "mailserver_canary"
+
+  host_name = "{{ srvc.Node }}"
+  groups = {{ srvc.ServiceTags | to_json }}
+  vars.mailsrv_enode = "{{ srvc.ServiceMeta.node_enode }}"
+}
+
+{% endfor %}
+
+{% for srvc in whisper_servers %}
+object Service "{{ srvc.ServiceID }}" {
+  import "generic-service"
+  check_command = "whisper_canary"
+
+  host_name = "{{ srvc.Node }}"
+  groups = {{ srvc.ServiceTags | to_json }}
+  vars.whisper_enode = "{{ srvc.ServiceMeta.node_enode }}"
+}
+
+{% endfor %}

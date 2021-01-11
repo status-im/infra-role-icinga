@@ -1,0 +1,65 @@
+---
+cont_state: started
+cont_recreate: false
+cont_restart: false
+
+icinga_cont_version: '2.11.4'
+icinga_cont_image_mod_tag: '{{ icinga_cont_version }}'
+icinga_cont_image_mod_name: 'statusteam/icinga2'
+icinga_cont_name: 'icinga'
+icinga_cont_vol: '/docker/{{ icinga_cont_name }}'
+
+icinga_api_cont_uid: 104
+icinga_api_cont_gid: 106
+icinga_web_cont_uid: 33
+# adjusted for dockremap
+icinga_api_host_uid: '{{ 100000 + icinga_api_cont_uid }}'
+icinga_api_host_gid: '{{ 100000 + icinga_api_cont_gid }}'
+icinga_web_host_uid: '{{ 100000 + icinga_web_cont_uid }}'
+icinga_cont_web_port: 80
+icinga_web_port: 8180
+icinga_api_port: 5665
+icinga_auto_login: admin
+icinga_domain: 'canary.infra.status.im'
+icinga_public_url: 'https://{{ icinga_domain }}/icingaweb2'
+icinga_from_mail: 'icinga@mgun.status.im'
+icinga_conf_d_path: '{{ icinga_cont_vol }}/etc/icinga2/conf.d'
+icinga_consul_pass: 'TheSingleton'
+# for discovering statusd-mail hosts
+consul_url: 'http://localhost:8500/v1/catalog'
+
+db_cont_image: 'mysql/mysql-server:5.7'
+db_cont_name: 'icinga-db'
+db_cont_port: 3306
+db_cont_vol: '/docker/{{ db_cont_name }}'
+db_cont_uid: 27
+db_host_uid: '{{ 100000 + db_cont_uid | int }}'
+
+# email sending settings
+smtp_host: smtp.mailgun.org
+smtp_port: 587
+smtp_from: 'alerts@mgun.status.im'
+smtp_user: '{{ lookup("passwordstore", "cloud/MailGun/smtp-user") }}'
+smtp_pass: '{{ lookup("passwordstore", "cloud/MailGun/smtp-pass") }}'
+
+# VictorOps notification settings
+victorops_org_id: '{{ lookup("passwordstore", "cloud/VictorOps/org-id") }}'
+victorops_service_key: '{{ lookup("passwordstore", "cloud/VictorOps/icinga-canary-key") }}'
+victorops_contact_email: jakub@status.im
+victorops_ack_back: true
+victorops_deb_version: '1.4.20'
+victorops_deb_file: 'victorops-nagios_{{ victorops_deb_version }}_all.deb'
+victorops_deb_url: 'https://github.com/victorops/monitoring_tool_releases/releases/download/victorops-nagios-{{ victorops_deb_version }}/{{ victorops_deb_file }}'
+
+# go necessary to build status-go
+golang_arch: 'go1.13.4.linux-amd64.tar.gz'
+golang_md5: '823f651b12a578e54ee905292294bd69'
+
+# mailserver-canary settings
+status_go_repo: 'https://github.com/status-im/status-go'
+status_go_path: '/opt/status-im/status-go'
+status_go_version: '3996aa7853f8274adb352e5629e123589a1a0671'
+
+statusd_bots_repo: 'https://github.com/status-im/statusd-bots.git'
+statusd_bots_path: '/opt/status-im/statusd-bots'
+statusd_bots_version: '0da56ebe56247ed106fd8ed4c9101b53f55f5482'

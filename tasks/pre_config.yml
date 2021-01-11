@@ -1,0 +1,44 @@
+---
+- name: Create directories for Icinga
+  file:
+    path: '{{ item }}'
+    state: directory
+    owner: '{{ icinga_api_host_uid }}'
+    group: '{{ icinga_api_host_gid }}'
+    recurse: true
+  with_items:
+    - '{{ icinga_cont_vol }}/etc'
+    - '{{ icinga_cont_vol }}/conf'
+    - '{{ icinga_cont_vol }}/logs'
+    - '{{ icinga_cont_vol }}/data'
+    - '{{ icinga_cont_vol }}/plugins'
+
+- name: Fix permissions for webicinga2
+  file:
+    path: '{{ icinga_cont_vol }}/etc/icingaweb2'
+    state: directory
+    owner: '{{ icinga_api_host_uid }}'
+    group: '{{ icinga_api_host_gid }}'
+    recurse: true
+
+- name: Create directories for MySQL
+  file:
+    path: '{{ db_cont_vol }}/data'
+    state: directory
+    owner: '{{ db_host_uid }}'
+    group: docker
+    recurse: true
+
+- name: Generate the SMTP configuration
+  template:
+    src: ssmtp.conf.j2
+    dest: '{{ icinga_cont_vol }}/conf/ssmtp.conf'
+    owner: '{{ icinga_api_host_uid }}'
+    group: docker
+
+- name: Generate the Apache configuration for autologin
+  template:
+    src: apache_icinga.conf.j2
+    dest: '{{ icinga_cont_vol }}/conf/apache_icinga.conf'
+    owner: '{{ icinga_web_host_uid }}'
+    group: '{{ icinga_api_host_gid }}'
